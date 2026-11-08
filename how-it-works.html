@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>CodeWinnow – How it works</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    pre, code { font-family: ui-monospace, 'Cascadia Code', monospace; }
+    .step-connector { width: 2px; background: var(--border); margin: 0 auto; }
+    .highlight-token { background:#fde68a;color:#92400e;padding:1px 4px;border-radius:3px;font-size:12px; }
+    .highlight-ast { background:#bbf7d0;color:#065f46;padding:1px 4px;border-radius:3px;font-size:12px; }
+    .highlight-hash { background:#ddd6fe;color:#4c1d95;padding:1px 4px;border-radius:3px;font-size:12px; }
+    .badge-high{background:#dcfce7;color:#166534;padding:2px 6px;border-radius:4px;font-size:11px;}
+    .badge-medium{background:#fef9c3;color:#854d0e;padding:2px 6px;border-radius:4px;font-size:11px;}
+    .badge-low{background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:11px;}
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-4">How CodeWinnow works</h1>
+    <p class="mb-6">The detector builds two fingerprint streams – one from raw lexical tokens, another from an AST‑normalised view – then compares the sets with Jaccard similarity.</p>
+
+    <!-- Pipeline steps -->
+    <h2 class="text-2xl font-semibold mb-3">Detection pipeline</h2>
+    <ol class="list-decimal list-inside space-y-4">
+      <li><strong>Token stream</strong>: <code>tokenize</code> strips comments/whitespace and returns tokens like <span class="highlight-token">NAME:def</span>.</li>
+      <li><strong>AST stream</strong>: <code>ast.parse</code> produces a tree; identifiers become <span class="highlight-ast">NAME</span> and literals become <span class="highlight-ast">CONST:type</span>.</li>
+      <li><strong>Rolling hash</strong>: a Rabin‑Karp polynomial hash is computed for every k‑gram (automatic k=3–9 based on token count; capped for tiny inputs).</li>
+      <li><strong>Winnowing</strong>: a sliding window of size <code>window</code> (default 4) selects the right‑most minimum hash as a fingerprint.</li>
+      <li><strong>Similarity</strong>: Jaccard similarity = |A∩B| / |A∪B| for the two fingerprint sets.</li>
+    </ol>
+
+    <!-- Comparison table -->
+    <h2 class="text-2xl font-semibold mt-8 mb-3">Token vs AST mode</h2>
+    <table class="w-full border-collapse mb-6">
+      <thead>
+        <tr class="border-b">
+          <th class="text-left py-2">Scenario</th>
+          <th class="text-center py-2">Token</th>
+          <th class="text-center py-2">AST</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b">
+          <td class="py-2">Exact copy‑paste</td>
+          <td class="text-center py-2"><span class="badge-high">Very high</span></td>
+          <td class="text-center py-2"><span class="badge-high">Very high</span></td>
+        </tr>
+        <tr class="border-b">
+          <td class="py-2">Renamed variables</td>
+          <td class="text-center py-2"><span class="badge-medium">Medium</span></td>
+          <td class="text-center py-2"><span class="badge-high">High</span></td>
+        </tr>
+        <tr class="border-b">
+          <td class="py-2">Changed constants</td>
+          <td class="text-center py-2"><span class="badge-medium">Medium</span></td>
+          <td class="text-center py-2"><span class="badge-high">High</span></td>
+        </tr>
+        <tr class="border-b">
+          <td class="py-2">Comments/whitespace only</td>
+          <td class="text-center py-2"><span class="badge-high">High</span></td>
+          <td class="text-center py-2"><span class="badge-high">High</span></td>
+        </tr>
+        <tr class="border-b">
+          <td class="py-2">Control‑flow rewrite</td>
+          <td class="text-center py-2"><span class="badge-low">Low</span></td>
+          <td class="text-center py-2"><span class="badge-medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td class="py-2">Different programs</td>
+          <td class="text-center py-2"><span class="badge-low">Low</span></td>
+          <td class="text-center py-2"><span class="badge-low">Low</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Sample pairs -->
+    <h2 class="text-2xl font-semibold mt-8 mb-3">Sample programs to try</h2>
+    <div class="space-y-6">
+      <div>
+        <h3 class="font-medium mb-1">1. Renamed variables (token medium, AST high)</h3>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def count_even(values):
+    total = 0
+    for value in values:
+        if value % 2 == 0:
+            total += 1
+    return total</code></pre>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def number_of_evens(items):
+    answer = 0
+    for item in items:
+        if item % 2 == 0:
+            answer += 1
+    return answer</code></pre>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">2. Added comments (both high)</h3>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def sum_squares(n):
+    result = 0
+    for i in range(n):
+        result += i * i
+    return result</code></pre>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def sum_squares(n):
+    # initialise accumulator
+    result = 0
+    # loop through each index
+    for i in range(n):
+        result += i * i  # square it
+    return result  # done</code></pre>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">3. Different constants (token medium, AST high)</h3>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def clamp(x):
+    if x < 0:
+        return 0
+    if x > 100:
+        return 100
+    return x</code></pre>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def clamp(x):
+    if x < -255:
+        return -255
+    if x > 255:
+        return 255
+    return x</code></pre>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">4. Unrelated programs (both low)</h3>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def count_even(values):
+    total = 0
+    for v in values:
+        if v % 2 == 0:
+            total += 1
+    return total</code></pre>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def reverse_words(sentence):
+    words = sentence.split()
+    return " ".join(reversed(words))</code></pre>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">5. Refactored logic (token low, AST medium)</h3>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def squares(nums):
+    result = []
+    for n in nums:
+        result.append(n * n)
+    return result</code></pre>
+        <pre class="bg-[var(--accent)] p-3 rounded"><code>def squares(nums):
+    return [n * n for n in nums]</code></pre>
+      </div>
+    </div>
+
+    <h2 class="text-2xl font-semibold mt-8 mb-3">Running the detector</h2>
+    <ul class="list-disc pl-6">
+      <li>Web UI: <code class="bg-[var(--accent)] px-1 py-0.5 rounded">python -m plagiarism_detector.web</code> then open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>.</li>
+      <li>CLI compare: <code class="bg-[var(--accent)] px-1 py-0.5 rounded">python -m plagiarism_detector compare file_a.py file_b.py</code></li>
+      <li>Evaluation on a JSON pair list: <code class="bg-[var(--accent)] px-1 py-0.5 rounded">python -m plagiarism_detector evaluate examples/pairs.json</code></li>
+    </ul>
+  </div>
+</body>
+</html>

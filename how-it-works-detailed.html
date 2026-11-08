@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    pre, code { font-family: ui-monospace, 'Cascadia Code', monospace; }
+    .step-connector { width: 2px; background: var(--border); margin: 0 auto; }
+    .pipeline-arrow { color: var(--primary); }
+    .tab-btn.active { background: var(--primary); color: var(--primary-foreground); }
+    textarea { resize: vertical; }
+    .highlight-token { background: #fde68a; color: #92400e; border-radius:3px; padding:1px 4px; font-size:12px; }
+    .highlight-ast   { background: #bbf7d0; color: #065f46; border-radius:3px; padding:1px 4px; font-size:12px; }
+    .highlight-hash  { background: #ddd6fe; color: #4c1d95; border-radius:3px; padding:1px 4px; font-size:12px; }
+    .badge-high   { background:#dcfce7; color:#166534; }
+    .badge-medium { background:#fef9c3; color:#854d0e; }
+    .badge-low    { background:#fee2e2; color:#991b1b; }
+    .sim-bar { height:12px; border-radius:6px; transition: width 0.6s ease; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased">
+
+<!-- ===================== HERO ===================== -->
+<div class="max-w-5xl mx-auto px-6 py-10">
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
+      🔍 Code Plagiarism Detector
+    </div>
+    <h1 class="text-4xl font-bold text-[var(--foreground)] mb-3">How Does It Work?</h1>
+    <p class="text-[var(--muted-foreground)] text-lg max-w-2xl mx-auto">
+      A visual walkthrough of Token Winnowing + AST Fingerprinting — the two algorithms powering this plagiarism detector.
+    </p>
+  </div>
+
+  <!-- ===================== OVERVIEW CARDS ===================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-12">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 shadow-sm">
+      <div class="text-2xl mb-2">🪙</div>
+      <h2 class="font-bold text-lg mb-1">Token Fingerprinting</h2>
+      <p class="text-[var(--muted-foreground)] text-sm">Converts code into a stream of lexical tokens (ignoring whitespace/comments), then hashes rolling k-grams and picks fingerprints via winnowing. Catches copy-paste well, but sensitive to renaming.</p>
+    </div>
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 shadow-sm">
+      <div class="text-2xl mb-2">🌳</div>
+      <h2 class="font-bold text-lg mb-1">AST Fingerprinting</h2>
+      <p class="text-[var(--muted-foreground)] text-sm">Parses code into an Abstract Syntax Tree, then normalises all variable names to <code class="text-xs bg-[var(--accent)] px-1 rounded">NAME</code> and literals to <code class="text-xs bg-[var(--accent)] px-1 rounded">CONST:type</code> before hashing. Robust against renaming & literal changes.</p>
+    </div>
+  </div>
+
+  <!-- ===================== STEP-BY-STEP PIPELINE ===================== -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-8 mb-12 shadow-sm">
+    <h2 class="text-2xl font-bold mb-6 text-center">🔄 The Detection Pipeline</h2>
+
+    <!-- Step 1 -->
+    <div class="flex gap-5 mb-2">
+      <div class="flex flex-col items-center">
+        <div class="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-lg shadow">1</div>
+        <div class="step-connector flex-1 mt-1"></div>
+      </div>
+      <div class="pb-6 flex-1">
+        <h3 class="font-semibold text-base mb-1">Source Code → Token Stream</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-3">Python's <code>tokenize</code> module strips whitespace, comments, newlines, and encoding markers. Each remaining token is labelled with its type.</p>
+        <div class="bg-[var(--accent)] rounded-lg p-4 text-sm font-mono overflow-x-auto">
+          <div class="text-[var(--muted-foreground)] mb-2 font-sans text-xs">Input code:</div>
+          <div class="mb-3 text-[var(--foreground)]">def count_even(values):<br>&nbsp;&nbsp;total = 0<br>&nbsp;&nbsp;for value in values: …</div>
+          <div class="text-[var(--muted-foreground)] mb-1 font-sans text-xs">Token stream output:</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="highlight-token">NAME:def</span>
+            <span class="highlight-token">NAME:count_even</span>
+            <span class="highlight-token">OP:(</span>
+            <span class="highlight-token">NAME:values</span>
+            <span class="highlight-token">OP:)</span>
+            <span class="highlight-token">OP::</span>
+            <span class="highlight-token">NAME:total</span>
+            <span class="highlight-token">OP:=</span>
+            <span class="highlight-token">NUMBER:0</span>
+            <span class="highlight-token">NAME:for</span>
+            <span class="highlight-token">…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="flex gap-5 mb-2">
+      <div class="flex flex-col items-center">
+        <div class="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-lg shadow">2</div>
+        <div class="step-connector flex-1 mt-1"></div>
+      </div>
+      <div class="pb-6 flex-1">
+        <h3 class="font-semibold text-base mb-1">AST Normalisation (for AST mode)</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-3">Instead of lexical tokens, the code is parsed into an AST. All identifiers become <span class="highlight-ast">NAME</span>, all literals become <span class="highlight-ast">CONST:type</span>. Only the <em>structure</em> survives.</p>
+        <div class="bg-[var(--accent)] rounded-lg p-4 text-sm font-mono overflow-x-auto">
+          <div class="text-[var(--muted-foreground)] mb-1 font-sans text-xs">AST stream for <em>both</em> original.py and renamed.py looks the same:</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="highlight-ast">Module</span>
+            <span class="highlight-ast">FunctionDef</span>
+            <span class="highlight-ast">ARG</span>
+            <span class="highlight-ast">Assign</span>
+            <span class="highlight-ast">NAME</span>
+            <span class="highlight-ast">CONST:int</span>
+            <span class="highlight-ast">For</span>
+            <span class="highlight-ast">NAME</span>
+            <span class="highlight-ast">NAME</span>
+            <span class="highlight-ast">If</span>
+            <span class="highlight-ast">…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="flex gap-5 mb-2">
+      <div class="flex flex-col items-center">
+        <div class="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-lg shadow">3</div>
+        <div class="step-connector flex-1 mt-1"></div>
+      </div>
+      <div class="pb-6 flex-1">
+        <h3 class="font-semibold text-base mb-1">Rabin–Karp Rolling k-gram Hashing</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-3">A sliding window of <strong>k</strong> consecutive tokens is hashed using a polynomial rolling hash (Rabin–Karp). This produces one hash per window position in O(n) time.</p>
+        <div class="bg-[var(--accent)] rounded-lg p-4 text-sm overflow-x-auto">
+          <div class="text-[var(--muted-foreground)] mb-2 font-sans text-xs">k=3 example — sliding window over token array:</div>
+          <div class="font-mono text-[var(--foreground)]">
+            [T1 T2 T3] T4 T5 → hash₀ <span class="highlight-hash">0x3f2a…</span><br>
+            &nbsp;T1 [T2 T3 T4] T5 → hash₁ <span class="highlight-hash">0x9b1c…</span><br>
+            &nbsp;&nbsp;T1 T2 [T3 T4 T5] → hash₂ <span class="highlight-hash">0x4e7d…</span>
+          </div>
+          <div class="mt-2 text-[var(--muted-foreground)] font-sans text-xs">Rolling: each new hash is derived from the previous in O(1) — no re-hashing from scratch.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="flex gap-5 mb-2">
+      <div class="flex flex-col items-center">
+        <div class="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-lg shadow">4</div>
+        <div class="step-connector flex-1 mt-1"></div>
+      </div>
+      <div class="pb-6 flex-1">
+        <h3 class="font-semibold text-base mb-1">Winnowing — Rightmost Minimum Selection</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-3">A second sliding window of size <strong>w</strong> moves over the hash array. From each window, the <em>rightmost minimum</em> hash is kept as a fingerprint. This guarantees any shared substring of ≥ k+w−1 tokens is detected.</p>
+        <div class="bg-[var(--accent)] rounded-lg p-4 text-sm font-mono overflow-x-auto">
+          <div class="text-[var(--muted-foreground)] mb-2 font-sans text-xs">Hash array: [5, 1, 1, 7, 3, 2] · window=3</div>
+          <div class="text-[var(--foreground)]">
+            Window [5, 1, 1] → min=1 at pos 2 → <span class="highlight-hash">keep (1, pos2)</span><br>
+            Window [1, 1, 7] → min=1 at pos 2 → same pos, skip<br>
+            Window [1, 7, 3] → min=1 at pos 1 → <span class="highlight-hash">keep (1, pos1)</span><br>
+            Window [7, 3, 2] → min=2 at pos 3 → <span class="highlight-hash">keep (2, pos3)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="flex gap-5">
+      <div class="flex flex-col items-center">
+        <div class="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-bold text-lg shadow">5</div>
+      </div>
+      <div class="flex-1">
+        <h3 class="font-semibold text-base mb-1">Jaccard Similarity</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-3">The fingerprint <em>sets</em> of both files are compared using Jaccard similarity: the ratio of shared hashes to total unique hashes.</p>
+        <div class="bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <div class="text-center font-mono text-lg text-[var(--foreground)] mb-2">
+            Similarity = |A ∩ B| / |A ∪ B|
+          </div>
+          <div class="text-[var(--muted-foreground)] text-xs text-center">0.0 = completely different · 1.0 = identical fingerprints</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== COMPARISON TABLE ===================== -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 mb-12 shadow-sm">
+    <h2 class="text-xl font-bold mb-4">🆚 Token vs AST Mode — When to Use Which?</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border-collapse">
+        <thead>
+          <tr class="border-b border-[var(--border)]">
+            <th class="text-left py-2 pr-4 text-[var(--muted-foreground)] font-semibold">Scenario</th>
+            <th class="text-center py-2 px-4 text-[var(--muted-foreground)] font-semibold">🪙 Token Similarity</th>
+            <th class="text-center py-2 px-4 text-[var(--muted-foreground)] font-semibold">🌳 AST Similarity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-[var(--border)]">
+            <td class="py-2.5 pr-4">Direct copy-paste</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">Very High ✓</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">Very High ✓</span></td>
+          </tr>
+          <tr class="border-b border-[var(--border)]">
+            <td class="py-2.5 pr-4">Variable / function renaming</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-medium px-2 py-0.5 rounded-full text-xs font-semibold">Medium ~</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">High ✓</span></td>
+          </tr>
+          <tr class="border-b border-[var(--border)]">
+            <td class="py-2.5 pr-4">Constant / literal changes</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-medium px-2 py-0.5 rounded-full text-xs font-semibold">Medium ~</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">High ✓</span></td>
+          </tr>
+          <tr class="border-b border-[var(--border)]">
+            <td class="py-2.5 pr-4">Added comments / whitespace</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">High ✓</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">High ✓</span></td>
+          </tr>
+          <tr class="border-b border-[var(--border)]">
+            <td class="py-2.5 pr-4">Control flow refactor</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-low px-2 py-0.5 rounded-full text-xs font-semibold">Low ✗</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-medium px-2 py-0.5 rounded-full text-xs font-semibold">Medium ~</span></td>
+          </tr>
+          <tr>
+            <td class="py-2.5 pr-4">Completely different logic</td>
+            <td class="text-center py-2.5 px-4"><span class="badge-low px-2 py-0.5 rounded-full text-xs font-semibold">Low ✓</span></td>
+            <td class="text-center py-2.5 px-4"><span class="badge-low px-2 py-0.5 rounded-full text-xs font-semibold">Low ✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== SAMPLE PROGRAMS ===================== -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-8 mb-12 shadow-sm">
+    <h2 class="text-2xl font-bold mb-2">🧪 Sample Programs to Test</h2>
+    <p class="text-[var(--muted-foreground)] text-sm mb-6">Copy any pair below and paste them into <a href="http://127.0.0.1:8000" target="_blank" class="text-blue-500 underline">your local web app</a> (run <code class="bg-[var(--accent)] px-1.5 py-0.5 rounded text-xs">python -m plagiarism_detector.web</code> first).</p>
+
+    <!-- Tab buttons -->
+    <div class="flex flex-wrap gap-2 mb-6" id="tabs">
+      <button onclick="showTab(0)" class="tab-btn active px-4 py-1.5 rounded-full text-sm font-semibold border border-[var(--border)] transition-colors">1 · Renamed Variables</button>
+      <button onclick="showTab(1)" class="tab-btn px-4 py-1.5 rounded-full text-sm font-semibold border border-[var(--border)] transition-colors">2 · Added Comments</button>
+      <button onclick="showTab(2)" class="tab-btn px-4 py-1.5 rounded-full text-sm font-semibold border border-[var(--border)] transition-colors">3 · Different Constants</button>
+      <button onclick="showTab(3)" class="tab-btn px-4 py-1.5 rounded-full text-sm font-semibold border border-[var(--border)] transition-colors">4 · Unrelated Code</button>
+      <button onclick="showTab(4)" class="tab-btn px-4 py-1.5 rounded-full text-sm font-semibold border border-[var(--border)] transition-colors">5 · Refactored Logic</button>
+    </div>
+
+    <!-- Tab panels -->
+    <div id="tab-panels">
+
+      <!-- Panel 0: Renamed Variables -->
+      <div class="tab-panel">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge-high px-3 py-1 rounded-full text-xs font-semibold">Token: Medium | AST: Very High</span>
+          <span class="text-[var(--muted-foreground)] text-sm">Same structure, all names changed</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program A — Original</span>
+              <button onclick="copyCode(this)" data-target="p0a" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p0a" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def count_even(values):
+    total = 0
+    for value in values:
+        if value % 2 == 0:
+            total += 1
+    return total</pre>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program B — Renamed</span>
+              <button onclick="copyCode(this)" data-target="p0b" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p0b" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def number_of_evens(items):
+    answer = 0
+    for item in items:
+        if item % 2 == 0:
+            answer += 1
+    return answer</pre>
+          </div>
+        </div>
+        <div class="mt-4 bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <strong>Expected result:</strong> Token similarity will be <em>moderate</em> (operators/structure shared, names differ). AST similarity will be <em>very high</em> (≈1.0) because normalisation makes both look identical.
+        </div>
+      </div>
+
+      <!-- Panel 1: Added Comments -->
+      <div class="tab-panel hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge-high px-3 py-1 rounded-full text-xs font-semibold">Token: High | AST: Very High</span>
+          <span class="text-[var(--muted-foreground)] text-sm">Comments & blank lines added — should not fool either mode</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program A — Clean</span>
+              <button onclick="copyCode(this)" data-target="p1a" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p1a" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def sum_squares(n):
+    result = 0
+    for i in range(n):
+        result += i * i
+    return result</pre>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program B — With Comments</span>
+              <button onclick="copyCode(this)" data-target="p1b" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p1b" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def sum_squares(n):
+    # initialise accumulator
+    result = 0
+    # loop through each index
+    for i in range(n):
+        result += i * i  # square it
+    return result  # done</pre>
+          </div>
+        </div>
+        <div class="mt-4 bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <strong>Expected result:</strong> Both modes should give very high similarity. Comments are stripped by the tokeniser, so they are invisible to both pipelines.
+        </div>
+      </div>
+
+      <!-- Panel 2: Different Constants -->
+      <div class="tab-panel hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge-medium px-3 py-1 rounded-full text-xs font-semibold">Token: Medium | AST: High</span>
+          <span class="text-[var(--muted-foreground)] text-sm">Same logic, magic numbers changed</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program A</span>
+              <button onclick="copyCode(this)" data-target="p2a" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p2a" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def clamp(x):
+    if x < 0:
+        return 0
+    if x > 100:
+        return 100
+    return x</pre>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program B — Different bounds</span>
+              <button onclick="copyCode(this)" data-target="p2b" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p2b" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def clamp(x):
+    if x < -255:
+        return -255
+    if x > 255:
+        return 255
+    return x</pre>
+          </div>
+        </div>
+        <div class="mt-4 bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <strong>Expected result:</strong> Token similarity moderate (literal tokens differ). AST similarity high — both constants become <code>CONST:int</code>, making structure identical.
+        </div>
+      </div>
+
+      <!-- Panel 3: Unrelated Code -->
+      <div class="tab-panel hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge-low px-3 py-1 rounded-full text-xs font-semibold">Token: Low | AST: Low</span>
+          <span class="text-[var(--muted-foreground)] text-sm">Genuinely different programs — should score near 0</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program A — Count evens</span>
+              <button onclick="copyCode(this)" data-target="p3a" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p3a" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def count_even(values):
+    total = 0
+    for value in values:
+        if value % 2 == 0:
+            total += 1
+    return total</pre>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program B — Reverse words</span>
+              <button onclick="copyCode(this)" data-target="p3b" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p3b" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def reverse_words(sentence):
+    words = sentence.split()
+    return " ".join(reversed(words))</pre>
+          </div>
+        </div>
+        <div class="mt-4 bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <strong>Expected result:</strong> Both scores near 0. These programs share no meaningful structure or tokens beyond basic Python keywords.
+        </div>
+      </div>
+
+      <!-- Panel 4: Refactored Logic -->
+      <div class="tab-panel hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge-medium px-3 py-1 rounded-full text-xs font-semibold">Token: Low | AST: Medium</span>
+          <span class="text-[var(--muted-foreground)] text-sm">Same result, different approach (for-loop vs list comprehension)</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program A — Loop style</span>
+              <button onclick="copyCode(this)" data-target="p4a" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p4a" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def squares(nums):
+    result = []
+    for n in nums:
+        result.append(n * n)
+    return result</pre>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-[var(--muted-foreground)]">Program B — Comprehension style</span>
+              <button onclick="copyCode(this)" data-target="p4b" class="text-xs text-blue-500 hover:underline">Copy</button>
+            </div>
+            <pre id="p4b" class="bg-[var(--accent)] rounded-lg p-4 text-xs overflow-x-auto text-[var(--foreground)] leading-relaxed">def squares(nums):
+    return [n * n for n in nums]</pre>
+          </div>
+        </div>
+        <div class="mt-4 bg-[var(--accent)] rounded-lg p-4 text-sm">
+          <strong>Expected result:</strong> Token similarity will be low (very different token sequences). AST similarity moderate — control structures differ (<code>For</code> body vs <code>ListComp</code>), but surrounding function definition shape is shared.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== HOW TO RUN ===================== -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 mb-10 shadow-sm">
+    <h2 class="text-xl font-bold mb-4">🚀 How to Run the Tool</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-[var(--accent)] rounded-lg p-4">
+        <div class="font-semibold text-sm mb-2">🌐 Web UI</div>
+        <pre class="text-xs text-[var(--foreground)] whitespace-pre-wrap">python -m plagiarism_detector.web</pre>
+        <div class="text-[var(--muted-foreground)] text-xs mt-2">Then open <a href="http://127.0.0.1:8000" class="text-blue-500">127.0.0.1:8000</a></div>
+      </div>
+      <div class="bg-[var(--accent)] rounded-lg p-4">
+        <div class="font-semibold text-sm mb-2">⌨️ CLI Compare</div>
+        <pre class="text-xs text-[var(--foreground)] whitespace-pre-wrap">python -m plagiarism_detector compare file_a.py file_b.py</pre>
+      </div>
+      <div class="bg-[var(--accent)] rounded-lg p-4">
+        <div class="font-semibold text-sm mb-2">📊 Evaluate Dataset</div>
+        <pre class="text-xs text-[var(--foreground)] whitespace-pre-wrap">python -m plagiarism_detector evaluate examples/pairs.json</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FOOTER ===================== -->
+  <div class="text-center text-[var(--muted-foreground)] text-xs pb-8">
+    Based on Schleimer, Wilkerson &amp; Aiken (2003) <em>Winnowing</em> · Karp &amp; Rabin (1987) <em>Rolling Hashing</em> · No external dependencies · Python 3.10+
+  </div>
+</div>
+
+<script>
+  const panels = document.querySelectorAll('.tab-panel');
+  const buttons = document.querySelectorAll('.tab-btn');
+
+  function showTab(index) {
+    panels.forEach((p, i) => p.classList.toggle('hidden', i !== index));
+    buttons.forEach((b, i) => {
+      b.classList.toggle('active', i === index);
+      if (i === index) {
+        b.style.background = 'var(--primary)';
+        b.style.color = 'var(--primary-foreground)';
+        b.style.borderColor = 'var(--primary)';
+      } else {
+        b.style.background = '';
+        b.style.color = '';
+        b.style.borderColor = '';
+      }
+    });
+  }
+
+  function copyCode(btn) {
+    const targetId = btn.getAttribute('data-target');
+    const text = document.getElementById(targetId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerText;
+      btn.innerText = 'Copied!';
+      setTimeout(() => btn.innerText = orig, 1500);
+    });
+  }
+
+  // Init first tab styles
+  showTab(0);
+</script>
+
+</body>
+</html>

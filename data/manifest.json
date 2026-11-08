@@ -1,0 +1,20 @@
+{
+  "dataset": "HanxiGuo/CodeMirage",
+  "url": "https://huggingface.co/datasets/HanxiGuo/CodeMirage",
+  "license": "CC-BY-NC-ND-4.0",
+  "selection": "First 300 Python rows per class in each official split; convenience subset, not representative.",
+  "files": {
+    "train_False_200.json": "cfacf7796548c6ff9e3811a4acf1a52d52682d43d3589b8aed77583474b51104",
+    "test_True_200.json": "8443fccd44d73bd5377afe0b5419b915e1477fc6364b22b476449f050eab49dd",
+    "train_True_200.json": "440e39fb339d13a98c0407dbf083b0868569f6ef0e4cac8a8bc1b4a810a88644",
+    "train_False_0.json": "a4b5b2421e17407c988a634b09d364631fe335331194263341238e4c1a4f3ef2",
+    "train_True_0.json": "61ea0de0e90a6cc891c255acb99f15f78efc3ea3bd81300d5da5983b3f927916",
+    "test_False_200.json": "594607f1c29161660d19c0e85564adb33dc075137d27b1debf04cf196582c4cf",
+    "test_True_0.json": "d9b2b87abc53337e9603de74eaafe1a59dba6cbd4bcfa6e5e9a517d0548753b2",
+    "train_True_100.json": "5e0c46cbfdb2f2a76bb9950f5f01eec8c7f929093591f499cfa8af1ac83361e5",
+    "test_False_100.json": "d2c6d0a1fcab337e180d9d9605465211df28064646394e2d2463cc6e0d34da16",
+    "train_False_100.json": "ceb19d125a449a5a041d4ce9e8c3accc1f94b88eef62570a1df19dae0f59a8d7",
+    "test_True_100.json": "0ea4c70efc92d7c6cf18ca22393bcfcea68d8c8df578e7c921c6da45fd16fa82",
+    "test_False_0.json": "fb993acc6a74d426c69430ec1622735a4de5c15147bfd092d9be0f0a11efab1c"
+  }
+}

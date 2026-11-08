@@ -1,0 +1,5 @@
+[
+  {"left": "original.py", "right": "renamed.py", "label": 1},
+  {"left": "original.py", "right": "unrelated.py", "label": 0},
+  {"left": "renamed.py", "right": "unrelated.py", "label": 0}
+]
