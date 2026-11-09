@@ -24,14 +24,15 @@ class WebTests(unittest.TestCase):
     def test_incomplete_python_returns_error(self):
         status,body=self.post({'left':'x = (','right':'pass'})
         self.assertEqual(status,400)
-        self.assertIn('Input/model error',body)
+        self.assertIn("class='error'",body)
     @unittest.skipUnless((ROOT/'models/copy.pkl').exists(),'Train models first')
     def test_trained_models_in_web(self):
         code=(ROOT/'examples/ml_demo.py').read_text()
         status,body=self.post({'left':code,'right':code})
         self.assertEqual(status,200)
-        self.assertIn('Likely copied/derived',body)
-        self.assertIn('Automatic k:',body)
+        self.assertIn('SAME CODE',body)
+        self.assertIn('Token similarity',body)
+        self.assertIn('AST similarity',body)
     @unittest.skipUnless((ROOT/'models/authorship.pkl').exists(),'Train models first')
     def test_authorship_without_reference(self):
         code=(ROOT/'examples/ml_demo.py').read_text()
